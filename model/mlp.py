@@ -7,10 +7,10 @@ class Mlp(nn.Module):
         super().__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(28*28, hidden_dim),
+            nn.Linear(28 * 28, hidden_dim),
             nn.Sigmoid(),
             nn.Linear(hidden_dim, 10),
-        ) 
-        
+        )
+
     def forward(self, x):
-        return self.net(x);
+        return self.net(x)

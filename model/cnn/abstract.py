@@ -27,15 +27,15 @@ class AbstractCNN(nn.Module):
         self.train()
 
         for name in names:
-            if name == 'head':
+            if name == "head":
                 cutils.set_parameters(self.head)
                 self.head.eval()
-            elif name == 'backbone':
+            elif name == "backbone":
                 for k, p in self.named_parameters():
-                    if not k.startswith('head'):
+                    if not k.startswith("head"):
                         cutils.set_parameters(p)
-            elif name == 'all':
+            elif name == "all":
                 cutils.set_parameters(self)
                 self.eval()
             else:
-                raise NotImplementedError(f'Unknown module name to freeze {name}')
+                raise NotImplementedError(f"Unknown module name to freeze {name}")

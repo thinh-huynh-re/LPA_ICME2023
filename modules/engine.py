@@ -16,19 +16,27 @@ from timm.utils import accuracy
 from . import utils
 import logger as lgr
 
-def train_one_epoch(model: torch.nn.Module, data_loader: Iterable, criterion,
-                    optimizer: torch.optim.Optimizer,
-                    device: torch.device, task_id: int, loss_scaler, args,
-                    mixup_fn: Optional[Mixup] = None, 
-                    teacher_model: torch.nn.Module = None,
-                    model_without_ddp: torch.nn.Module = None):
+
+def train_one_epoch(
+    model: torch.nn.Module,
+    data_loader: Iterable,
+    criterion,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+    task_id: int,
+    loss_scaler,
+    args,
+    mixup_fn: Optional[Mixup] = None,
+    teacher_model: torch.nn.Module = None,
+    model_without_ddp: torch.nn.Module = None,
+):
     model.train()
     # logging start
     lgr.update_state(num_batches=len(data_loader))
     lgr.add_state(total_epochs=1)
     lgr.train_epoch_start()
     metric_logger = utils.MetricLogger()
-    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1))
+    metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1))
     # logging end
 
     for batch_index, (samples, targets, tasks) in enumerate(data_loader):
@@ -54,39 +62,61 @@ def train_one_epoch(model: torch.nn.Module, data_loader: Iterable, criterion,
                 token_tasks = token_tasks.flatten(-2)
 
             # lgr.lgrs.loguru.debug(f'after mixup targets: {targets.shape} {targets}')
-            
 
         with torch.cuda.amp.autocast(enabled=not args.no_amp):
             outputs = model(samples.contiguous())
-            loss_dict = model_without_ddp.train_forward(outputs, samples, targets, tasks, task_id, teacher_model, criterion, args, lam=lam, token_tasks=token_tasks)
+            loss_dict = model_without_ddp.train_forward(
+                outputs,
+                samples,
+                targets,
+                tasks,
+                task_id,
+                teacher_model,
+                criterion,
+                args,
+                lam=lam,
+                token_tasks=token_tasks,
+            )
 
         loss = sumup_loss(loss_dict)
         # loss = sum(loss_dict.values())
         loss = check_loss(loss)
 
         # this attribute is added by timm on one optimizer (adahessian)
-        is_second_order = hasattr(optimizer, 'is_second_order') and optimizer.is_second_order
+        is_second_order = (
+            hasattr(optimizer, "is_second_order") and optimizer.is_second_order
+        )
 
-        loss_scaler(loss, optimizer, model_without_ddp, clip_grad=args.clip_grad, parameters=model.parameters(), create_graph=is_second_order)
+        loss_scaler(
+            loss,
+            optimizer,
+            model_without_ddp,
+            clip_grad=args.clip_grad,
+            parameters=model.parameters(),
+            create_graph=is_second_order,
+        )
 
         torch.cuda.synchronize()
 
         # logging start
         metric_logger.update(lr=optimizer.param_groups[0]["lr"], **loss_dict)
 
-        lgr.train_batch_end_with_interval(lr=optimizer.param_groups[0]["lr"], **loss_dict)
+        lgr.train_batch_end_with_interval(
+            lr=optimizer.param_groups[0]["lr"], **loss_dict
+        )
         # logging end
 
-    if hasattr(model_without_ddp, 'hook_after_epoch'):
+    if hasattr(model_without_ddp, "hook_after_epoch"):
         model_without_ddp.hook_after_epoch()
-    
+
     # logging start
-    metric_logger.synchronize_between_processes() # average across the entire epoch
+    metric_logger.synchronize_between_processes()  # average across the entire epoch
     lgr.train_epoch_end(metric_logger=metric_logger)
     # logging end
 
+
 def sumup_loss(d):
-    loss = 0.
+    loss = 0.0
     for k, v in d.items():
         if not math.isfinite(v.item()):
             lgr.lgrs.loguru.warning(f'loss item "{k}" is "{v.item()}", ignoring it.')
@@ -94,9 +124,10 @@ def sumup_loss(d):
             loss += v
     return loss
 
+
 def check_loss(loss):
     if not math.isfinite(loss.item()):
-        raise Exception('Loss is {}, stopping training'.format(loss.item()))
+        raise Exception("Loss is {}, stopping training".format(loss.item()))
     return loss
 
 
@@ -113,7 +144,6 @@ def evaluate(data_loader, model, task_id, device):
 
     metric_logger = utils.MetricLogger()
 
-
     for batch_index, (images, target, task_ids) in enumerate(data_loader):
         # logging start
         lgr.update_state(batch_num=batch_index)
@@ -126,7 +156,7 @@ def evaluate(data_loader, model, task_id, device):
         # compute output
         with torch.cuda.amp.autocast():
             output = model(images)
-            logits = output['logits']
+            logits = output["logits"]
             loss = criterion(logits, target)
 
         acc1, acc5 = accuracy(logits, target, topk=(1, min(5, logits.shape[1])))
@@ -134,29 +164,33 @@ def evaluate(data_loader, model, task_id, device):
         # logging start
         batch_size = images.shape[0]
         metric_logger.update(loss=loss.item())
-        metric_logger.meters['acc1'].update(acc1.item(), n=batch_size)
-        metric_logger.meters['acc5'].update(acc5.item(), n=batch_size)
-        for i in range(task_id+1):
+        metric_logger.meters["acc1"].update(acc1.item(), n=batch_size)
+        metric_logger.meters["acc5"].update(acc5.item(), n=batch_size)
+        for i in range(task_id + 1):
             mask = task_ids == i
             num_samples = torch.count_nonzero(mask)
             if num_samples == 0:
                 continue
-            
-            task_acc1 = accuracy(logits[mask], target[mask], topk=(1,))[0]
-            metric_logger.meters[f'task{i}_acc1'].update(task_acc1.item(), n=num_samples)
 
-        lgr.eval_batch_end_with_interval(loss=loss.item(), acc1=acc1.item(), acc5=acc5.item())
+            task_acc1 = accuracy(logits[mask], target[mask], topk=(1,))[0]
+            metric_logger.meters[f"task{i}_acc1"].update(
+                task_acc1.item(), n=num_samples
+            )
+
+        lgr.eval_batch_end_with_interval(
+            loss=loss.item(), acc1=acc1.item(), acc5=acc5.item()
+        )
         # logging end
 
     # logging start
-    metric_logger.synchronize_between_processes() # average across the entire epoch
+    metric_logger.synchronize_between_processes()  # average across the entire epoch
 
     lgr.eval_epoch_end(metric_logger=metric_logger)
 
 
 def indexes_task_outputs(logits, targets, increment_per_task):
     if increment_per_task[0] != increment_per_task[1]:
-        raise NotImplementedError(f'Not supported yet for non equal task size')
+        raise NotImplementedError(f"Not supported yet for non equal task size")
 
     inc = increment_per_task[0]
     indexes = torch.zeros(len(logits), inc).long()

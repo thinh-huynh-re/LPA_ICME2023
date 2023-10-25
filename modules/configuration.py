@@ -1,10 +1,12 @@
 import yaml
 from pathlib import Path
 
+
 def load_yaml(p):
-    with Path(p).open('r') as f:
+    with Path(p).open("r") as f:
         content = yaml.safe_load(f)
     return content
+
 
 def load_configs(config_list):
     configs = dict()

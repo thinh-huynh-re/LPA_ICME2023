@@ -32,7 +32,7 @@ class NOP(object):
 
     def __contains__(self, item):
         return False
-        
+
     def __missing__(self, key):
         pass
 
@@ -97,7 +97,7 @@ class NOP(object):
     def __divmod__(self, other):
         return self
 
-    def __pow__(self,n):
+    def __pow__(self, n):
         return self
 
     def __lshift__(self, other):
@@ -224,29 +224,28 @@ class NOP(object):
         return NotImplemented
 
     def __str__(self):
-        return ''
+        return ""
 
     def __repr__(self):
-        return 'NOP'
+        return "NOP"
 
     def __unicode__(self):
-        return u''
+        return ""
 
     def __bytes__(self):
-        return b''
+        return b""
 
     def __format__(self, formatstr):
-        return ''
+        return ""
 
     def __hash__(self):
         return None
 
     def __nonzero__(self):
         return False
-    
+
     def next(self):
         raise StopIteration
-        
+
     def __next__(self):
         raise StopIteration
-

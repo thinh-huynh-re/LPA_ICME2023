@@ -3,6 +3,7 @@ import copy
 import numpy as np
 import torch
 
+
 class Memory:
     def __init__(self, memory_size, nb_total_classes, rehearsal, fixed=True):
         self.memory_size = memory_size
@@ -18,7 +19,11 @@ class Memory:
     def memory_per_class(self):
         if self.fixed:
             return self.memory_size // self.nb_total_classes
-        return self.memory_size // self.nb_classes if self.nb_classes > 0 else self.memory_size
+        return (
+            self.memory_size // self.nb_classes
+            if self.nb_classes > 0
+            else self.memory_size
+        )
 
     def get_dataset(self, base_dataset):
         dataset = copy.deepcopy(base_dataset)
@@ -35,10 +40,7 @@ class Memory:
         return len(self.x) if self.x is not None else 0
 
     def save(self, path):
-        np.savez(
-            path,
-            x=self.x, y=self.y, t=self.t
-        )
+        np.savez(path, x=self.x, y=self.y, t=self.t)
 
     def load(self, path):
         data = np.load(path)
@@ -53,9 +55,9 @@ class Memory:
         x, y, t = [], [], []
         for class_id in np.unique(self.y):
             indexes = np.where(self.y == class_id)[0]
-            x.append(self.x[indexes[:self.memory_per_class]])
-            y.append(self.y[indexes[:self.memory_per_class]])
-            t.append(self.t[indexes[:self.memory_per_class]])
+            x.append(self.x[indexes[: self.memory_per_class]])
+            y.append(self.y[indexes[: self.memory_per_class]])
+            t.append(self.t[indexes[: self.memory_per_class]])
 
         self.x = np.concatenate(x)
         self.y = np.concatenate(y)
@@ -65,7 +67,7 @@ class Memory:
         self.nb_classes += nb_new_classes
 
         x, y, t = herd_samples(dataset, model, self.memory_per_class, self.rehearsal)
-        #assert len(y) == self.memory_per_class * nb_new_classes, (len(y), self.memory_per_class, nb_new_classes)
+        # assert len(y) == self.memory_per_class * nb_new_classes, (len(y), self.memory_per_class, nb_new_classes)
 
         if self.x is None:
             self.x, self.y, self.t = x, y, t
@@ -84,17 +86,15 @@ def herd_samples(dataset, model, memory_per_class, rehearsal):
         indexes = []
         for class_id in np.unique(y):
             class_indexes = np.where(y == class_id)[0]
-            indexes.append(
-                np.random.choice(class_indexes, size=memory_per_class)
-            )
+            indexes.append(np.random.choice(class_indexes, size=memory_per_class))
         indexes = np.concatenate(indexes)
 
         return x[indexes], y[indexes], t[indexes]
     elif "closest" in rehearsal:
-        if rehearsal == 'closest_token':
-            handling = 'last'
+        if rehearsal == "closest_token":
+            handling = "last"
         else:
-            handling = 'all'
+            handling = "all"
 
         features, targets = extract_features(dataset, model, handling)
         indexes = []
@@ -107,17 +107,15 @@ def herd_samples(dataset, model, memory_per_class, rehearsal):
             distances = np.power(class_features - class_mean, 2).sum(-1)
             class_closest_indexes = np.argsort(distances)
 
-            indexes.append(
-                class_indexes[class_closest_indexes[:memory_per_class]]
-            )
+            indexes.append(class_indexes[class_closest_indexes[:memory_per_class]])
 
         indexes = np.concatenate(indexes)
         return x[indexes], y[indexes], t[indexes]
     elif "furthest" in rehearsal:
-        if rehearsal == 'furthest_token':
-            handling = 'last'
+        if rehearsal == "furthest_token":
+            handling = "last"
         else:
-            handling = 'all'
+            handling = "all"
 
         features, targets = extract_features(dataset, model, handling)
         indexes = []
@@ -130,17 +128,15 @@ def herd_samples(dataset, model, memory_per_class, rehearsal):
             distances = np.power(class_features - class_mean, 2).sum(-1)
             class_furthest_indexes = np.argsort(distances)[::-1]
 
-            indexes.append(
-                class_indexes[class_furthest_indexes[:memory_per_class]]
-            )
+            indexes.append(class_indexes[class_furthest_indexes[:memory_per_class]])
 
         indexes = np.concatenate(indexes)
         return x[indexes], y[indexes], t[indexes]
     elif "icarl":
-        if rehearsal == 'icarl_token':
-            handling = 'last'
+        if rehearsal == "icarl_token":
+            handling = "last"
         else:
-            handling = 'all'
+            handling = "all"
 
         features, targets = extract_features(dataset, model, handling)
         indexes = []
@@ -159,10 +155,9 @@ def herd_samples(dataset, model, memory_per_class, rehearsal):
         raise ValueError(f"Unknown rehearsal method {rehearsal}!")
 
 
-
-def extract_features(dataset, model, ensemble_handling='last'):
-    #transform = copy.deepcopy(dataset.trsf.transforms)
-    #dataset.trsf = transforms.Compose(transform[-2:])
+def extract_features(dataset, model, ensemble_handling="last"):
+    # transform = copy.deepcopy(dataset.trsf.transforms)
+    # dataset.trsf = transforms.Compose(transform[-2:])
 
     loader = torch.utils.data.DataLoader(
         dataset,
@@ -170,14 +165,14 @@ def extract_features(dataset, model, ensemble_handling='last'):
         num_workers=2,
         pin_memory=True,
         drop_last=False,
-        shuffle=False
+        shuffle=False,
     )
 
     features, targets = [], []
 
     with torch.no_grad():
         for x, y, _ in loader:
-            if hasattr(model, 'module'):
+            if hasattr(model, "module"):
                 model_out = model.module.forward_features(x.cuda())
             else:
                 model_out = model.forward_features(x.cuda())
@@ -187,19 +182,23 @@ def extract_features(dataset, model, ensemble_handling='last'):
                 feats = model_out
 
             if isinstance(feats, list):
-                if ensemble_handling == 'last':
+                if ensemble_handling == "last":
                     feats = feats[-1]
-                elif ensemble_handling == 'all':
+                elif ensemble_handling == "all":
                     feats = torch.cat(feats, dim=1)
                 else:
-                    raise NotImplementedError(f'Unknown handdling of multiple features {ensemble_handling}')
+                    raise NotImplementedError(
+                        f"Unknown handdling of multiple features {ensemble_handling}"
+                    )
             elif len(feats.shape) == 3:  # joint tokens (B, Tasks, Channels)
-                if ensemble_handling == 'last':
+                if ensemble_handling == "last":
                     feats = feats[:, -1]
-                elif ensemble_handling == 'all':
+                elif ensemble_handling == "all":
                     feats = feats.flatten(1)
                 else:
-                    raise NotImplementedError(f'Unknown handdling of multiple features {ensemble_handling}')
+                    raise NotImplementedError(
+                        f"Unknown handdling of multiple features {ensemble_handling}"
+                    )
 
             feats = feats.cpu().numpy()
             y = y.numpy()
@@ -210,7 +209,7 @@ def extract_features(dataset, model, ensemble_handling='last'):
     features = np.concatenate(features)
     targets = np.concatenate(targets)
 
-    #dataset.trsf = transforms.Compose(transform)
+    # dataset.trsf = transforms.Compose(transform)
     return features, targets
 
 
@@ -223,9 +222,10 @@ def icarl_selection(features, nb_examplars):
     w_t = mu
     iter_herding, iter_herding_eff = 0, 0
 
-    while not (
-        np.sum(herding_matrix != 0) == min(nb_examplars, features.shape[0])
-    ) and iter_herding_eff < 1000:
+    while (
+        not (np.sum(herding_matrix != 0) == min(nb_examplars, features.shape[0]))
+        and iter_herding_eff < 1000
+    ):
         tmp_t = np.dot(w_t, D)
         ind_max = np.argmax(tmp_t)
         iter_herding_eff += 1
@@ -240,16 +240,16 @@ def icarl_selection(features, nb_examplars):
     return herding_matrix.argsort()[:nb_examplars]
 
 
-def get_finetuning_dataset(dataset, memory, finetuning='balanced'):
-    if finetuning == 'balanced':
+def get_finetuning_dataset(dataset, memory, finetuning="balanced"):
+    if finetuning == "balanced":
         x, y, t = memory.get()
         new_dataset = copy.deepcopy(dataset)
         new_dataset._x = x
         new_dataset._y = y
         new_dataset._t = t
-    elif finetuning in ('all', 'none'):
+    elif finetuning in ("all", "none"):
         new_dataset = dataset
     else:
-        raise NotImplementedError(f'Unknown finetuning method {finetuning}')
+        raise NotImplementedError(f"Unknown finetuning method {finetuning}")
 
     return new_dataset

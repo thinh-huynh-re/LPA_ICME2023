@@ -31,7 +31,9 @@ class RASampler(torch.utils.data.Sampler):
         self.num_samples = int(math.ceil(len(self.dataset) * 3.0 / self.num_replicas))
         self.total_size = self.num_samples * self.num_replicas
         # self.num_selected_samples = int(math.ceil(len(self.dataset) / self.num_replicas))
-        self.num_selected_samples = int(math.floor(len(self.dataset) // 256 * 256 / self.num_replicas))
+        self.num_selected_samples = int(
+            math.floor(len(self.dataset) // 256 * 256 / self.num_replicas)
+        )
         self.shuffle = shuffle
 
     def __iter__(self):
@@ -45,14 +47,14 @@ class RASampler(torch.utils.data.Sampler):
 
         # add extra samples to make it evenly divisible
         indices = [ele for ele in indices for i in range(3)]
-        indices += indices[:(self.total_size - len(indices))]
+        indices += indices[: (self.total_size - len(indices))]
         assert len(indices) == self.total_size
 
         # subsample
-        indices = indices[self.rank:self.total_size:self.num_replicas]
+        indices = indices[self.rank : self.total_size : self.num_replicas]
         assert len(indices) == self.num_samples
 
-        return iter(indices[:self.num_selected_samples])
+        return iter(indices[: self.num_selected_samples])
 
     def __len__(self):
         return self.num_selected_samples
@@ -75,11 +77,14 @@ def get_sampler(dataset_train, dataset_val, args):
             )
         if args.dist_eval:
             if len(dataset_val) % num_tasks != 0:
-                print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
-                      'This will slightly alter validation results as extra duplicate entries are added to achieve '
-                      'equal num of samples per-process.')
+                print(
+                    "Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. "
+                    "This will slightly alter validation results as extra duplicate entries are added to achieve "
+                    "equal num of samples per-process."
+                )
             sampler_val = torch.utils.data.DistributedSampler(
-                dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=False)
+                dataset_val, num_replicas=num_tasks, rank=global_rank, shuffle=False
+            )
         else:
             sampler_val = torch.utils.data.SequentialSampler(dataset_val)
     else:

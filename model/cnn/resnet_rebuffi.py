@@ -11,7 +11,6 @@ from . import AbstractCNN
 
 
 class DownsampleStride(nn.Module):
-
     def __init__(self, n=2):
         super(DownsampleStride, self).__init__()
         self._n = n
@@ -21,7 +20,6 @@ class DownsampleStride(nn.Module):
 
 
 class DownsampleConv(nn.Module):
-
     def __init__(self, inplanes, planes):
         super().__init__()
 
@@ -37,7 +35,9 @@ class DownsampleConv(nn.Module):
 class ResidualBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, increase_dim=False, last_relu=False, downsampling="stride"):
+    def __init__(
+        self, inplanes, increase_dim=False, last_relu=False, downsampling="stride"
+    ):
         super(ResidualBlock, self).__init__()
 
         self.increase_dim = increase_dim
@@ -54,7 +54,9 @@ class ResidualBlock(nn.Module):
         )
         self.bn_a = nn.BatchNorm2d(planes)
 
-        self.conv_b = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv_b = nn.Conv2d(
+            planes, planes, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.bn_b = nn.BatchNorm2d(planes)
 
         if increase_dim:
@@ -113,7 +115,9 @@ class PreActResidualBlock(nn.Module):
         )
 
         self.bn_b = nn.BatchNorm2d(planes)
-        self.conv_b = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv_b = nn.Conv2d(
+            planes, planes, kernel_size=3, stride=1, padding=1, bias=False
+        )
 
         if increase_dim:
             self.downsample = DownsampleStride()
@@ -142,7 +146,6 @@ class PreActResidualBlock(nn.Module):
 
 
 class Stage(nn.Module):
-
     def __init__(self, blocks, block_relu=False):
         super().__init__()
 
@@ -181,7 +184,7 @@ class CifarResNet(AbstractCNN):
         last_relu=True,
         **kwargs
     ):
-        """ Constructor
+        """Constructor
         Args:
           depth: number of layers.
           num_classes: number of classes
@@ -198,14 +201,19 @@ class CifarResNet(AbstractCNN):
 
         super(CifarResNet, self).__init__()
 
-        self.conv_1_3x3 = nn.Conv2d(channels, nf, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv_1_3x3 = nn.Conv2d(
+            channels, nf, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.bn_1 = nn.BatchNorm2d(nf)
 
         self.stage_1 = self._make_layer(Block, nf, increase_dim=False, n=n)
         self.stage_2 = self._make_layer(Block, nf, increase_dim=True, n=n - 1)
         self.stage_3 = self._make_layer(Block, 2 * nf, increase_dim=True, n=n - 2)
         self.stage_4 = Block(
-            4 * nf, increase_dim=False, last_relu=False, downsampling=self._downsampling_type
+            4 * nf,
+            increase_dim=False,
+            last_relu=False,
+            downsampling=self._downsampling_type,
         )
 
         if pooling_config["type"] == "avg":
@@ -218,7 +226,7 @@ class CifarResNet(AbstractCNN):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -239,13 +247,15 @@ class CifarResNet(AbstractCNN):
                     planes,
                     increase_dim=True,
                     last_relu=True,
-                    downsampling=self._downsampling_type
+                    downsampling=self._downsampling_type,
                 )
             )
             planes = 2 * planes
 
         for i in range(n):
-            layers.append(Block(planes, last_relu=True, downsampling=self._downsampling_type))
+            layers.append(
+                Block(planes, last_relu=True, downsampling=self._downsampling_type)
+            )
 
         return Stage(layers, block_relu=self.last_relu)
 
