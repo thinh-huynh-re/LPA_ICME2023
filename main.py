@@ -95,9 +95,8 @@ def main(args):
                 dataset_true_val.concat(dataset_val)
             dataset_val = dataset_true_val
 
-        for i in range(
-            3
-        ):  # Quick check to ensure same preprocessing between train/test
+        for i in range(3):
+            # Quick check to ensure same preprocessing between train/test
             assert (
                 abs(
                     dataset_train.trsf.transforms[-1].mean[i]
