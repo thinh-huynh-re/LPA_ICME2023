@@ -1,6 +1,6 @@
 black
 timm
-torch
+torch==2.0.1
 continuum
 matplotlib
 loguru
